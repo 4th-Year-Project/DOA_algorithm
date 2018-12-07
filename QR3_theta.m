@@ -1,5 +1,5 @@
 % function Ang = QR3_theta(n) 
-Ang = [45];    % Angles of source
+Ang = [90];    % Angles of source
 
 f = 8.68e8;     % Frequency
 c = 299792458;  % Propagation velocity
@@ -49,7 +49,7 @@ hold on
 plot(DOA1)
 title('Direction of Arrival') 
 xlabel('Angle (Degrees)')
-ylabel('Amplitude')
+ylabel('DOA amplitude')
 
 SP = round(Ang, 0);
 line([SP SP], get(hax,'YLim'),'Color',[1 0 0])
