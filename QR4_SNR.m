@@ -1,3 +1,5 @@
+for z = 1:40
+
 % function Ang = QR3_theta(n) 
 Ang = [90];    % Angles of source
 
@@ -7,6 +9,7 @@ wl = c/f;       % Wavelength
 d = wl/2;       % Distance between antennas
 M = 4;          % Number of elements
 L = 1;          % Number of sources
+NF = 170+z;
 
 sim('ULA_4ant_sim1', 0.1);      % Simulate 4x1 ULA signal
 
@@ -43,22 +46,32 @@ for t=1:180
 %     TP2 = Qn*(A(:,:,t)');
 end
  
-fig = figure;
-hax = axes;
-hold on
-plot(DOA1)
-title('Direction of Arrival') 
-xlabel('Angle (Degrees)')
-ylabel('DOA amplitude')
+% fig = figure;
+% hax = axes;
+% hold on
+% plot(DOA1)
+% title('Direction of Arrival') 
+% xlabel('Angle (Degrees)')
+% ylabel('DOA amplitude')
+% 
+% SP = round(Ang, 0);
+% line([SP SP], get(hax,'YLim'),'Color',[1 0 0])
 
-SP = round(Ang, 0);
-line([SP SP], get(hax,'YLim'),'Color',[1 0 0])
+ZN(:,:,z) = zeros(301, 4);
 
 %Noise 
-ZN = Sim - RX_out;
+ZN(:,:,z) = Sim - RX_out;
 
-SNR = snr(RX_out, ZN)
+SNR(:,:,z) = snr(RX_out, ZN(:,:,z));
 
-[val, idx] = max(DOA1)
+[val(z), idx(z)] = max(DOA1);
 
-Dev = abs(90-idx)/180
+Dev(z) = (abs(90-idx(z))/180 )* 100;
+
+SSNR(z) = SNR(:,:,z);
+
+plot(SSNR, Dev) 
+xlabel('SNR input')
+ylabel('DOA estimate % Error')
+
+end
