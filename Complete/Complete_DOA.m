@@ -50,7 +50,7 @@ sample_delay = round(sample_delay, 0);
 [ai_signal, aq_signal] = sig_align(ni_sig, nq_sig, sample_delay);
 
 %%%%%%%% DOA calculation with simulated signals
-DOA(45, 0.01, false);
+DOA(-30, 0.1, false);
 %%%%%%%% 
 
 for k = 1:4  
@@ -58,7 +58,7 @@ for k = 1:4
 end
 
 %%%%%%%% DOA calculation with real signals
-[ANGLE_BS, ANGLE_MVDR] = DOA_calc(doa_data, 170, true);
+[ANGLE_BS, ANGLE_MVDR, ANGLE_QR] = DOA_calc(doa_data, 170, true);
 
 
 clear x y plot_f PhDiff PhDiffstr k a b
@@ -259,7 +259,7 @@ end
 
 a(:,:,j) = circshift(u, L);
 a(1,1,j) = 1;
-A(:,:,j) = a(:,:,j).';                   %Response through 180 degrees
+Simulated_data(:,:,j) = a(:,:,j).';                   %Response through 180 degrees
     
 end
 
@@ -275,33 +275,55 @@ end
 
 Rxx = Rxx/snapshots;                     % R signal received, N snapshots, correlation matrix
 
+[Q, R] = qr(Rxx);          % QR factorisation
+
+Qs = Q(:,(1:L));
+Qn = Q(:,(L+1):4);
+
+QnH = Qn';
+
 for j = 1:18000
-   a_tht(:,:,j) = A(:,:,j);
+   a_tht(:,:,j) = Simulated_data(:,:,j);
    a_thtH(:,:,j) = a_tht(:,:,j)';
    
    P_BS(j) = (a_thtH(:,:,j) * Rxx * a_tht(:,:,j));     % Calculate power spectrums
    P_MVDR(j) = 1/(a_thtH(:,:,j) * inv(Rxx) * a_tht(:,:,j));
    
+   P_QR(j) = (1 / (a_thtH(:,:,j) * Qn * QnH * a_tht(:,:,j)) );
 end
 
 
 if plot_f == true
    % Plot power spectrums
    
-subplot(2,1,1);
+subplot(3,1,1);
 plot(Y, real(P_BS))
 title('Beamscan Spectrum')
-subplot(2,1,2);
+subplot(3,1,2);
 plot(Y, real(P_MVDR))
 title('MVDR Spectrum')
 
-figure
-subplot(2,1,1);
-plot(real(signal))
-title('Real components')
-subplot(2,1,2);
-plot(imag(signal))
-title('Imaginary components')
+subplot(3,1,3);
+plot(Y, (real(P_QR(1,:))))
+title('QR Spectrum')
+
+    
+   % Find peaks of plots
+
+[BS_pks, BS_locs] = findpeaks(real(P_BS));
+BS_DOA = [BS_pks; BS_locs];
+[M,I] = max(BS_DOA (1,:));
+BS_DOA = Y(BS_DOA(2,I));
+
+[MVDR_pks, MVDR_locs] = findpeaks(real(P_MVDR));
+MVDR_DOA = [MVDR_pks; MVDR_locs];
+[M,I] = max(MVDR_DOA(1,:));
+MVDR_DOA = Y(MVDR_DOA(2,I));
+
+[QR_pks, QR_locs] = findpeaks(real(P_QR));
+QR_DOA = [MVDR_pks; MVDR_locs];
+[M,I] = max(QR_DOA(1,:));
+QR_DOA = Y(QR_DOA(2,I));
 
 end
     
@@ -317,16 +339,24 @@ MVDR_DOA = [MVDR_pks; MVDR_locs];
 [M,I] = max(MVDR_DOA(1,:));
 MVDR_DOA = Y(MVDR_DOA(2,I));
 
+[QR_pks, QR_locs] = findpeaks(real(P_QR));
+QR_DOA = [MVDR_pks; MVDR_locs];
+[M,I] = max(QR_DOA(1,:));
+QR_DOA = Y(QR_DOA(2,I));
 
-fprintf(' True angle = %4.2f\n\n MATLAB MUSIC DOA angle= %4.2f\n\n Beamscan DOA angle = %4.2f\n\n MVDR DOA angle = %4.2f\n\n', ang_true, mus_ang, BS_DOA, MVDR_DOA); 
+
+method = {'True angle', 'MATLAB MUSIC', 'Beamscan', 'MVDR', 'QR '};
+angle = [ang_true, mus_ang, BS_DOA, MVDR_DOA, QR_DOA];
+
+Simulated_data = table;
+Simulated_data.Method = method';
+Simulated_data.Angle = angle';
+display(Simulated_data)
 
 clear i j k BS_pks BS_locs MVDR_pks MVDR_locs I M eta x u
-
-
-
 end
 
-function [BS_DOA, MVDR_DOA] =  DOA_calc(signal, snapshots, plot_sdoa)
+function [BS_DOA, MVDR_DOA, QR_DOA] =  DOA_calc(signal, snapshots, plot_sdoa)
 
 fc = 8.68e8;                    % Operating frequency
 fs = 100e3;                      % Sampling frequency
@@ -364,27 +394,38 @@ end
 
 Rxx = Rxx/snapshots;                     % R signal received, N snapshots, correlation matrix
 
+[Q, R] = qr(Rxx);          % QR factorisation
+
+Qs = Q(:,(1:L));
+Qn = Q(:,(L+1):M);
+
+QnH = Qn';
+
 for j = 1:18000
-   a_tht(:,:,j) = A(:,:,j);				 % array response matrix
-   a_thtH(:,:,j) = a_tht(:,:,j)';		 % conjugate of array response matrix	
+   a_tht(:,:,j) = A(:,:,j);
+   a_thtH(:,:,j) = a_tht(:,:,j)';
    
- %%%%%%%% Calculate power spectrums
- 
-   P_BS(j) = (a_thtH(:,:,j) * Rxx * a_tht(:,:,j));     
+   P_BS(j) = (a_thtH(:,:,j) * Rxx * a_tht(:,:,j));     % Calculate power spectrums
    P_MVDR(j) = 1/(a_thtH(:,:,j) * inv(Rxx) * a_tht(:,:,j));
    
+   P_QR(j) = (1 / (a_thtH(:,:,j) * Qn * QnH * a_tht(:,:,j)) );
 end
 
 
 if plot_sdoa == true
    % Plot power spectrums
    
-subplot(2,1,1);
+subplot(3,1,1);
 plot(Y, real(P_BS))
 title('Beamscan Spectrum')
-subplot(2,1,2);
+subplot(3,1,2);
 plot(Y, real(P_MVDR))
 title('MVDR Spectrum')
+
+subplot(3,1,3);
+plot(Y, (real(P_QR(1,:))))
+title('QR Spectrum')
+
 end
     
 %%%%%%%% Find peaks of plots
@@ -399,5 +440,17 @@ MVDR_DOA = [MVDR_pks; MVDR_locs];
 [M,I] = max(MVDR_DOA(1,:));
 MVDR_DOA = Y(MVDR_DOA(2,I));
 
+[QR_pks, QR_locs] = findpeaks(real(P_QR));
+QR_DOA = [MVDR_pks; MVDR_locs];
+[M,I] = max(QR_DOA(1,:));
+QR_DOA = Y(QR_DOA(2,I));
+
+method = {'Beamscan', 'MVDR', 'QR '};
+angle = [BS_DOA, MVDR_DOA, QR_DOA];
+
+Real_data = table;
+Real_data.Method = method';
+Real_data.Angle = angle';
+display(Real_data)
 
 end
